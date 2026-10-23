@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Macro Red Team</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='%23e5484d'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Macro Red Team</h1>
+        <p>Autonomous agents that try to break a forecast before you trust it</p>
+      </div>
+    </div>
+    <span id="mode-badge" class="badge"></span>
+  </header>
+
+  <section class="launch" aria-label="Forecast to attack">
+    <label for="forecast" class="eyebrow">Forecast under review</label>
+    <div class="launch-row">
+      <textarea id="forecast" rows="2" spellcheck="false">India's real GDP growth will be 7.0% in FY28.</textarea>
+      <div class="launch-controls">
+        <label class="field">Max rounds
+          <select id="rounds">
+            <option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option>
+          </select>
+        </label>
+        <label class="field" id="engine-field" hidden>Engine
+          <select id="engine">
+            <option value="n8n">n8n agents</option>
+            <option value="simulate">Scripted demo</option>
+          </select>
+        </label>
+        <button id="attack" class="attack" type="button"><span class="pulse" aria-hidden="true"></span>Attack forecast</button>
+      </div>
+    </div>
+    <p id="banner" class="banner" hidden></p>
+  </section>
+
+  <main class="grid">
+    <aside class="col agents-col" aria-label="Agents">
+      <h2 class="eyebrow">Adversaries <span class="hint">credits: 1 = one tool call</span></h2>
+      <div id="agents"></div>
+    </aside>
+
+    <section class="col log-col" aria-label="War log">
+      <h2 class="eyebrow">War log <span id="round-label" class="hint"></span></h2>
+      <div id="log" class="log">
+        <div class="empty">
+          <p>Submit a forecast. Seven adversarial agents will investigate it with their own budgets, delegate to each other and challenge each other's claims. A judge cross-examines every round and decides what to investigate next — or that the evidence is sufficient.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="col side-col" aria-label="State">
+      <div class="panel">
+        <h2 class="eyebrow">Robustness</h2>
+        <div class="gauge"><span id="robustness">—</span><small>/100</small></div>
+        <svg id="spark" class="spark" viewBox="0 0 200 48" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <p id="robustness-note" class="hint">Judge's running estimate, per round</p>
+      </div>
+      <div class="panel">
+        <h2 class="eyebrow">Load-bearing assumptions</h2>
+        <ul id="assumptions" class="assumptions"><li class="hint">Waiting for the judge's decomposition</li></ul>
+      </div>
+      <div class="panel">
+        <h2 class="eyebrow">Investigation tree</h2>
+        <ul id="tree" class="tree"><li class="hint">No investigations yet</li></ul>
+      </div>
+    </aside>
+  </main>
+
+  <section id="verdict" class="verdict" hidden aria-live="polite"></section>
+
+  <script src="app.js"></script>
+</body>
+</html>

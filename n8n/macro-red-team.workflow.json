@@ -1,0 +1,1212 @@
+{
+  "name": "Macro Red Team",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "macro-red-team",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "4eb2f1c8-84bc-7301-6461-86c002f49466",
+      "name": "Attack Forecast",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "cdf42051-58a9-9762-8566-05219a1f80cc"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "563f1dd0-3531-d9ea-a9fa-48791ad7c370",
+              "name": "run_id",
+              "value": "={{ $json.body.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ad7846d8-bad3-6c9b-92d4-08ef50b4fee7",
+              "name": "token",
+              "value": "={{ $json.body.token }}",
+              "type": "string"
+            },
+            {
+              "id": "a653f663-cfda-2f99-809d-7c6731dfd7dd",
+              "name": "api_base",
+              "value": "={{ $json.body.api_base }}",
+              "type": "string"
+            },
+            {
+              "id": "6d92e402-0f38-bf0d-f027-ccaa4ce50c97",
+              "name": "forecast",
+              "value": "={{ $json.body.forecast }}",
+              "type": "string"
+            },
+            {
+              "id": "da82130c-a350-a345-db7e-ded1971fbd8f",
+              "name": "max_rounds",
+              "value": "={{ $json.body.max_rounds }}",
+              "type": "number"
+            },
+            {
+              "id": "ca80a5fe-73f6-feab-a6b2-55f9417ed77b",
+              "name": "investigate_url",
+              "value": "={{ $json.body.investigate_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "06788b40-562a-9960-01e7-790577b9dde6",
+      "name": "Run Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=FORECAST SUBMITTED FOR RED-TEAMING:\n{{ $json.forecast }}\n\nDecompose it and assign the opening investigations.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Judge of MACRO RED TEAM. A forecast has been submitted for adversarial review.\nYour first job is to decompose it and open the investigation.\n\n1. Identify the forecast variable, its value and its horizon.\n2. List 3-6 load-bearing assumptions the forecast silently depends on (consumption, investment,\n   external environment, supply, policy, data quality...). Give each a load_bearing weight 0-1:\n   how much of the forecast collapses if it is wrong.\n3. Give each of the 7 agents one sharp opening investigation aimed at the assumption most relevant to\n   their speciality: demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender).\n   Each agent only has 10 credits (1 credit = 1 tool call) for the whole exercise, so opening moves\n   should cost 1-3 credits.\nAnswer through the format_final_json_response tool.",
+          "maxIterations": 4,
+          "enableStreaming": false
+        }
+      },
+      "id": "b3a99704-ae12-40b3-21e7-4cee8cea09a1",
+      "name": "Judge: Decompose Forecast",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive",
+          "effort": "high"
+        }
+      },
+      "id": "3a0e302d-fd27-6241-47b2-316694522623",
+      "name": "Claude: Judge (plan)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        400,
+        520
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "mrtAnthropicKey1",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"forecast_label\": {\n      \"type\": \"string\",\n      \"description\": \"What is forecast, e.g. \\\"India real GDP growth, FY28\\\"\"\n    },\n    \"forecast_value\": {\n      \"type\": \"string\",\n      \"description\": \"e.g. \\\"7.0%\\\"\"\n    },\n    \"horizon\": {\n      \"type\": \"string\",\n      \"description\": \"e.g. \\\"FY2027-28\\\"\"\n    },\n    \"assumptions\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"id\": {\n            \"type\": \"string\",\n            \"description\": \"A1, A2, ...\"\n          },\n          \"text\": {\n            \"type\": \"string\",\n            \"description\": \"The assumption\"\n          },\n          \"load_bearing\": {\n            \"type\": \"number\",\n            \"description\": \"0-1\"\n          }\n        },\n        \"required\": [\n          \"id\",\n          \"text\",\n          \"load_bearing\"\n        ]\n      }\n    },\n    \"tasks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"agent\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"demand\",\n              \"supply\",\n              \"global\",\n              \"data\",\n              \"historian\",\n              \"blackswan\",\n              \"bull\"\n            ]\n          },\n          \"question\": {\n            \"type\": \"string\",\n            \"description\": \"One precise, answerable investigation question\"\n          },\n          \"credits\": {\n            \"type\": \"number\",\n            \"description\": \"Credits to allocate, 1-4\"\n          },\n          \"type\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"investigate\",\n              \"challenge\"\n            ]\n          },\n          \"target_claim_id\": {\n            \"type\": \"string\",\n            \"description\": \"Claim id being challenged, e.g. C4 (only for type=challenge)\"\n          },\n          \"reason\": {\n            \"type\": \"string\",\n            \"description\": \"Why this investigation matters\"\n          }\n        },\n        \"required\": [\n          \"agent\",\n          \"question\",\n          \"credits\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"forecast_label\",\n    \"forecast_value\",\n    \"assumptions\",\n    \"tasks\"\n  ]\n}"
+      },
+      "id": "b93fc6f9-7120-9da6-8038-31816c3997c1",
+      "name": "Plan Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Run Context').first().json.api_base }}/api/runs/{{ $('Run Context').first().json.run_id }}/plan",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-run-token",
+              "value": "={{ $('Run Context').first().json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.output) }}"
+      },
+      "id": "2ef238ca-0ab9-53a9-16c9-f4c20bbd5f8d",
+      "name": "Referee: Open Round 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "tasks",
+        "options": {}
+      },
+      "id": "70852487-73b6-a2d9-92aa-a4da64718190",
+      "name": "Split Tasks",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Run Context').first().json.investigate_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_id: $('Run Context').first().json.run_id, token: $('Run Context').first().json.token, api_base: $('Run Context').first().json.api_base, task: $json }) }}",
+        "options": {
+          "timeout": 900000
+        }
+      },
+      "id": "4385dc2e-ffcc-7a6a-58d0-d5ae8cd8ae39",
+      "name": "Dispatch Investigations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "macro-red-team-investigate",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "b6491021-9d8b-005c-7456-62a6c8385019",
+      "name": "Investigate Task",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        900
+      ],
+      "webhookId": "dd2e9a96-bcf4-2a9c-f315-9f39c8d7d973"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3fcbca93-0b36-791b-0e73-fdd0794cfd79",
+              "name": "run_id",
+              "value": "={{ $json.body.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "6fe3793b-4a60-6100-1680-5087d613e2a6",
+              "name": "token",
+              "value": "={{ $json.body.token }}",
+              "type": "string"
+            },
+            {
+              "id": "9ef22e83-4987-6072-b477-b9a1b99da1fe",
+              "name": "api_base",
+              "value": "={{ $json.body.api_base }}",
+              "type": "string"
+            },
+            {
+              "id": "f58b3ba7-eefe-1524-f0bc-11184db86df1",
+              "name": "task",
+              "value": "={{ $json.body.task }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "02fe4f43-387b-050c-2e1a-fe6ea08a49f4",
+      "name": "Task Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pick the persona for this task and brief it with the live blackboard.\nconst PERSONAS = {\n  \"demand\": \"You are the Demand Economist in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nYou test whether domestic demand is strong enough to deliver the forecast.\\nInvestigate: private consumption, household and bank credit (secured vs unsecured), wages and real incomes,\\nemployment, rural vs urban demand, housing, private investment demand, household savings.\\nAsk: is demand income-funded or debt-funded? Is it broad-based or concentrated? Is it pulled forward?\\n\\nYou are rewarded when your demand-side arguments survive the judge's cross-examination.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\",\n  \"supply\": \"You are the Supply Economist in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nYou try to destroy the forecast from the supply side.\\nInvestigate: commodities, energy availability and prices, capacity utilisation, productivity,\\nsupply chains and logistics, agriculture and monsoon, power, labour supply, corporate capex intentions.\\nAsk: what binding constraint caps growth or forces inflation and tighter policy?\\n\\nYou are rewarded for breaking the forecast from the supply side.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\",\n  \"global\": \"You are the Global Shock Agent in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nYour explicit mission: find an external event that could invalidate this forecast.\\nInvestigate: the Fed and global rates, China, crude oil, geopolitics, global trade, capital flows,\\ncurrencies and the dollar, remittances. Quantify the transmission channel into the forecast economy.\\n\\nYou are rewarded for finding an external event that would invalidate the forecast.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\",\n  \"data\": \"You are the Data Detective in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nYou do not debate economics. You attack the data itself.\\nAsk: are these indicators measuring what we think they measure? Look for base effects, inventory\\naccumulation, statistical discrepancies, government-spending-driven prints, deflator problems,\\nrevisions, survey bias, and forecasts that all trace back to one source. Identify which single input\\nthe forecast leans on most heavily (back-solve the arithmetic) and who else forecasts that input.\\n\\nYou are rewarded for finding evidence that is unreliable, double-counted or misread.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\",\n  \"historian\": \"You are the Historical Analog Agent in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nYou search economic history: \\\"When have we seen this combination of conditions before?\\\"\\nFind concrete episodes (country, years) with a similar configuration and report what happened next,\\nand where the analogy breaks down. Use Wikipedia and World Bank series to anchor dates and numbers.\\n\\nYou are rewarded for finding comparable historical episodes that change the debate.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\",\n  \"blackswan\": \"You are the Black Swan Agent in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nFind a plausible event that nobody else on the blackboard has considered.\\nIt must be grounded: you must fill the \\\"scenario\\\" object with\\nevent -> transmission mechanism -> measurable indicators -> economic impact (with a rough magnitude)\\nand an honest probability. Avoid risks other agents already raised.\\n\\nYou are rewarded for a plausible scenario nobody else considered — not science fiction.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\",\n  \"bull\": \"You are the Bull Defender in MACRO RED TEAM, an adversarial multi-agent system that tries to break\\neconomic forecasts before decision-makers trust them.\\n\\nYou are the forecast's defence counsel. Build the strongest evidence-backed case that the forecast\\nis robust, and rebut the most dangerous attacks on the blackboard by claim id. Concede points you\\ncannot rebut — the judge punishes unsupported optimism. Your stance is normally \\\"supports\\\".\\n\\nYou are rewarded when the forecast survives. You lose when attacks you failed to rebut stand.\\n\\nRULES OF THE GAME\\n- You have a personal budget of 10 investigation credits for the whole red-team exercise.\\n  1 credit = 1 tool call (search, data series, Wikipedia, calculator). The referee charges you\\n  for every tool call you make; overspending this task's allocation eats into your future budget.\\n- Spend where the expected information gain is highest. Do not search for things already on the blackboard.\\n- Every factual claim needs evidence: what the data/source says, the source name, the URL when a tool\\n  gave you one, and the date of the data. Never invent numbers, sources or URLs. If you could not\\n  verify something, say so and lower your confidence.\\n- Distinguish correlation from causation: state the causal mechanism explicitly (A -> B -> C).\\n- You may challenge another agent's claim by its id (e.g. \\\"C4\\\") if you have evidence against it.\\n- When you are done, set \\\"done\\\": true. If a decisive question remains, propose at most 2 follow-ups.\\n  A follow-up for yourself spends your own credits next round. You may delegate to another\\n  specialist (demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent), data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)) when their expertise is required.\\n- Answer through the format_final_json_response tool using the required schema.\"\n};\n\nconst task = $input.first().json.task;\nconst lines = [\n  `ROUND ${task.round} of max ${task.max_rounds}. Task ${task.task_id} (${task.type}), ordered by ${task.requested_by || 'the judge'}.`,\n  `YOUR INVESTIGATION: ${task.question}`,\n];\nif (task.target_claim_id) lines.push(`TARGET CLAIM TO CHALLENGE: ${task.target_claim_id}`);\nif (task.reason) lines.push(`WHY: ${task.reason}`);\nlines.push(\n  `CREDITS ALLOCATED TO THIS TASK: ${task.credits} (max ${task.credits} tool calls). Credits left after this task: ${task.credits_left_after}.`,\n  '',\n  '=== BLACKBOARD ===',\n  task.blackboard,\n);\nreturn [{\n  json: {\n    system_prompt: PERSONAS[task.agent],\n    user_prompt: lines.join('\\n'),\n    // Hard cap on tool round-trips; the referee bills the calls actually made.\n    max_iterations: task.credits + 2,\n  },\n}];"
+      },
+      "id": "941da6c8-03e0-ae58-d9b1-3f9dee665842",
+      "name": "Brief the Agent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.user_prompt }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $json.system_prompt }}",
+          "maxIterations": "={{ $json.max_iterations }}",
+          "enableStreaming": false,
+          "returnIntermediateSteps": true
+        }
+      },
+      "id": "5b32be1f-2dd9-dfe4-08b8-994113dc46d4",
+      "name": "Economist Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        680,
+        900
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive",
+          "effort": "medium"
+        }
+      },
+      "id": "bd5180a1-5e4e-21a0-ef0c-9747795c2dc5",
+      "name": "Claude: Economists",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        460,
+        1160
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "mrtAnthropicKey1",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"headline\": {\n      \"type\": \"string\",\n      \"description\": \"One-line conclusion, max 14 words\"\n    },\n    \"stance\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"attacks\",\n        \"supports\",\n        \"neutral\"\n      ],\n      \"description\": \"Effect on the forecast\"\n    },\n    \"target_assumption\": {\n      \"type\": \"string\",\n      \"description\": \"Assumption id this bears on, e.g. A2\"\n    },\n    \"challenges_claim\": {\n      \"type\": \"string\",\n      \"description\": \"Claim id you are rebutting, if any\"\n    },\n    \"argument\": {\n      \"type\": \"string\",\n      \"description\": \"Your argument in 2-5 sentences\"\n    },\n    \"causal_mechanism\": {\n      \"type\": \"string\",\n      \"description\": \"A -> B -> C transmission to the forecast\"\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"description\": \"0-1\"\n    },\n    \"evidence\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"fact\": {\n            \"type\": \"string\",\n            \"description\": \"What the data or source says\"\n          },\n          \"source\": {\n            \"type\": \"string\",\n            \"description\": \"Publisher / dataset\"\n          },\n          \"url\": {\n            \"type\": \"string\",\n            \"description\": \"URL returned by a tool, if any\"\n          },\n          \"date\": {\n            \"type\": \"string\",\n            \"description\": \"Date or period of the data\"\n          }\n        },\n        \"required\": [\n          \"fact\",\n          \"source\"\n        ]\n      }\n    },\n    \"scenario\": {\n      \"type\": \"object\",\n      \"description\": \"Black Swan Agent only\",\n      \"properties\": {\n        \"event\": {\n          \"type\": \"string\",\n          \"description\": \"The event\"\n        },\n        \"transmission\": {\n          \"type\": \"string\",\n          \"description\": \"Transmission mechanism\"\n        },\n        \"indicators\": {\n          \"type\": \"array\",\n          \"items\": {\n            \"type\": \"string\"\n          }\n        },\n        \"impact\": {\n          \"type\": \"string\",\n          \"description\": \"Economic impact with rough magnitude\"\n        },\n        \"probability\": {\n          \"type\": \"string\",\n          \"description\": \"Honest probability\"\n        }\n      }\n    },\n    \"indicators_to_watch\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"indicator\": {\n            \"type\": \"string\",\n            \"description\": \"Indicator\"\n          },\n          \"threshold\": {\n            \"type\": \"string\",\n            \"description\": \"e.g. \\\"> 14%\\\"\"\n          },\n          \"direction\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"breaks\",\n              \"validates\"\n            ]\n          }\n        },\n        \"required\": [\n          \"indicator\",\n          \"threshold\"\n        ]\n      }\n    },\n    \"follow_ups\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"agent\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"demand\",\n              \"supply\",\n              \"global\",\n              \"data\",\n              \"historian\",\n              \"blackswan\",\n              \"bull\"\n            ]\n          },\n          \"question\": {\n            \"type\": \"string\",\n            \"description\": \"One precise, answerable investigation question\"\n          },\n          \"credits\": {\n            \"type\": \"number\",\n            \"description\": \"Credits to allocate, 1-4\"\n          },\n          \"type\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"investigate\",\n              \"challenge\"\n            ]\n          },\n          \"target_claim_id\": {\n            \"type\": \"string\",\n            \"description\": \"Claim id being challenged, e.g. C4 (only for type=challenge)\"\n          },\n          \"reason\": {\n            \"type\": \"string\",\n            \"description\": \"Why this investigation matters\"\n          }\n        },\n        \"required\": [\n          \"agent\",\n          \"question\",\n          \"credits\"\n        ]\n      }\n    },\n    \"done\": {\n      \"type\": \"boolean\",\n      \"description\": \"true if you have enough evidence and need no follow-up\"\n    }\n  },\n  \"required\": [\n    \"headline\",\n    \"stance\",\n    \"argument\",\n    \"confidence\",\n    \"evidence\",\n    \"done\"\n  ]\n}"
+      },
+      "id": "d54dad94-65d9-8541-49e6-1b04e8a04c6b",
+      "name": "Finding Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        600,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "toolDescription": "Search the web and news (Tavily). Use for recent news, central-bank statements, forecasts by institutions, company announcements and research. Costs 1 credit.",
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $fromAI('query', 'A precise search query, include country, indicator and year', 'string'), max_results: 5, search_depth: 'advanced', include_answer: true }) }}"
+      },
+      "id": "62991b5d-ebae-06f1-4eb2-d630cd615943",
+      "name": "Web Search",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        740,
+        1160
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "mrtTavilyApiKey1",
+          "name": "Tavily API (Bearer)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {},
+        "toolDescription": "Find FRED (St. Louis Fed) data series IDs by keyword, e.g. \"India real GDP\", \"Brent crude\", \"US 10-year yield\". Costs 1 credit.",
+        "url": "https://api.stlouisfed.org/fred/series/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_text",
+              "value": "={{ $fromAI('search_text', 'Keywords describing the series', 'string') }}"
+            },
+            {
+              "name": "file_type",
+              "value": "json"
+            },
+            {
+              "name": "limit",
+              "value": "8"
+            },
+            {
+              "name": "order_by",
+              "value": "popularity"
+            }
+          ]
+        }
+      },
+      "id": "216bd1b8-28b2-8c5f-c643-03c677d9ae38",
+      "name": "FRED Search",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        1160
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "mrtFredApiKey001",
+          "name": "FRED API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {},
+        "toolDescription": "Fetch observations for a FRED series ID (e.g. DCOILBRENTEU for Brent, FEDFUNDS, DEXINUS for INR/USD), newest first. Costs 1 credit.",
+        "url": "https://api.stlouisfed.org/fred/series/observations",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "series_id",
+              "value": "={{ $fromAI('series_id', 'FRED series ID', 'string') }}"
+            },
+            {
+              "name": "observation_start",
+              "value": "={{ $fromAI('observation_start', 'Start date YYYY-MM-DD', 'string') }}"
+            },
+            {
+              "name": "file_type",
+              "value": "json"
+            },
+            {
+              "name": "sort_order",
+              "value": "desc"
+            },
+            {
+              "name": "limit",
+              "value": "40"
+            }
+          ]
+        }
+      },
+      "id": "dc764057-8fde-d9d8-63fd-8f2f8384e5d5",
+      "name": "FRED Series",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        1160
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "mrtFredApiKey001",
+          "name": "FRED API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {},
+        "toolDescription": "Annual World Bank indicator for a country. Useful codes: NY.GDP.MKTP.KD.ZG (GDP growth), NE.GDI.FTOT.KD.ZG (gross fixed capital formation growth), NE.CON.PRVT.KD.ZG (household consumption growth), FP.CPI.TOTL.ZG (inflation), BN.CAB.XOKA.GD.ZS (current account % GDP), NE.EXP.GNFS.KD.ZG (export growth). No API key needed. Costs 1 credit.",
+        "url": "=https://api.worldbank.org/v2/country/{{ $fromAI('country', 'ISO country code, e.g. IN, CN, US, or WLD for world', 'string') }}/indicator/{{ $fromAI('indicator', 'World Bank indicator code', 'string') }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "per_page",
+              "value": "30"
+            },
+            {
+              "name": "date",
+              "value": "={{ $fromAI('years', 'Year range like 2000:2026', 'string') }}"
+            }
+          ]
+        }
+      },
+      "id": "06b0b0d7-0e05-8475-4b35-dfb090982d1a",
+      "name": "World Bank Indicator",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        1160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9152266f-0184-5bdf-3e52-5c19dde306ca",
+      "name": "Wikipedia",
+      "type": "@n8n/n8n-nodes-langchain.toolWikipedia",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        1160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "7a5084d1-0893-24da-ccdb-44a4809dac62",
+      "name": "Calculator",
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Task Context').first().json.api_base }}/api/runs/{{ $('Task Context').first().json.run_id }}/findings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-run-token",
+              "value": "={{ $('Task Context').first().json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ task_id: $('Task Context').first().json.task.task_id, output: $json.output ?? { error: $json.error }, steps: $json.intermediateSteps ?? [] }) }}"
+      },
+      "id": "6e2ade56-9588-eb55-325c-85128f7cf8b5",
+      "name": "Referee: Submit Finding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "fa7f5b26-3454-617e-7460-dbd65b6511fe",
+      "name": "Collect Round",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Run Context').first().json.api_base }}/api/runs/{{ $('Run Context').first().json.run_id }}/rounds/close",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-run-token",
+              "value": "={{ $('Run Context').first().json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "274777b1-761a-ce6e-480e-b0646f1bf90d",
+      "name": "Referee: Close Round",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.digest }}\n\nCross-examine round {{ $json.round }} (max {{ $json.max_rounds }}). Rule, flag, and decide whether more investigation is needed.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Judge of MACRO RED TEAM. You do not vote and you cannot search; you cross-examine.\nYou are rewarded for correctly identifying which arguments survive.\n\nFor the claims on the blackboard, examine:\n- EVIDENCE: who actually has supporting evidence (sourced, dated, from tools) vs assertion?\n- INDEPENDENCE: are several agents making the same argument because they used the same source?\n  Use the SOURCE CONCENTRATION section. Correlated evidence counts once.\n- CAUSAL VALIDITY: is correlation being mistaken for causation? Is the mechanism complete?\n- CONTRADICTIONS: where do agents disagree, and what data would resolve it?\n- MISSING INFORMATION: what unknown matters most?\n\nThen:\n- Rule on every claim whose status is \"unresolved\": survives, falls, or unresolved (with reason and flags\n  such as \"shared source\", \"correlation ≠ causation\", \"no evidence\", \"stale data\").\n- Update the status of each assumption (untested, holding, under attack, weakened, fragile, broken).\n- If a decisive disagreement is unresolved, create up to 4 new investigations. Target the critical unknown.\n  Use type \"challenge\" with target_claim_id to make an adversary attack a specific claim (e.g. order the\n  bull to rebut the strongest bear claim, or a bear to attack the bull's best defence). Only assign work to\n  agents who still have credits.\n- Set sufficient=true only when further investigation would not change the verdict, or the key\n  disagreements are resolved.\n- Estimate the forecast's robustness 0-100 given everything so far.\nAnswer through the format_final_json_response tool.",
+          "maxIterations": 4,
+          "enableStreaming": false
+        }
+      },
+      "id": "c4de362f-c8a3-5471-64e4-e7dde126c03e",
+      "name": "Judge: Cross-Examine",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive",
+          "effort": "high"
+        }
+      },
+      "id": "c5ddebab-c64c-1859-45cd-6cfa18cf5b37",
+      "name": "Claude: Judge (cross-examine)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        2280,
+        520
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "mrtAnthropicKey1",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"round_summary\": {\n      \"type\": \"string\",\n      \"description\": \"2-3 sentences: what this round established\"\n    },\n    \"rulings\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"claim_id\": {\n            \"type\": \"string\",\n            \"description\": \"e.g. C3\"\n          },\n          \"status\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"survives\",\n              \"falls\",\n              \"unresolved\"\n            ]\n          },\n          \"reason\": {\n            \"type\": \"string\",\n            \"description\": \"Why\"\n          },\n          \"flags\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          }\n        },\n        \"required\": [\n          \"claim_id\",\n          \"status\",\n          \"reason\"\n        ]\n      }\n    },\n    \"assumption_status\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"id\": {\n            \"type\": \"string\",\n            \"description\": \"A1\"\n          },\n          \"status\": {\n            \"type\": \"string\",\n            \"description\": \"untested | holding | under attack | weakened | fragile | broken\"\n          }\n        },\n        \"required\": [\n          \"id\",\n          \"status\"\n        ]\n      }\n    },\n    \"contradictions\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"between\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"string\"\n            }\n          },\n          \"issue\": {\n            \"type\": \"string\",\n            \"description\": \"The disagreement\"\n          },\n          \"resolving_data\": {\n            \"type\": \"string\",\n            \"description\": \"Data that would resolve it\"\n          }\n        },\n        \"required\": [\n          \"between\",\n          \"issue\"\n        ]\n      }\n    },\n    \"missing_information\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"new_investigations\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"agent\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"demand\",\n              \"supply\",\n              \"global\",\n              \"data\",\n              \"historian\",\n              \"blackswan\",\n              \"bull\"\n            ]\n          },\n          \"question\": {\n            \"type\": \"string\",\n            \"description\": \"One precise, answerable investigation question\"\n          },\n          \"credits\": {\n            \"type\": \"number\",\n            \"description\": \"Credits to allocate, 1-4\"\n          },\n          \"type\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"investigate\",\n              \"challenge\"\n            ]\n          },\n          \"target_claim_id\": {\n            \"type\": \"string\",\n            \"description\": \"Claim id being challenged, e.g. C4 (only for type=challenge)\"\n          },\n          \"reason\": {\n            \"type\": \"string\",\n            \"description\": \"Why this investigation matters\"\n          }\n        },\n        \"required\": [\n          \"agent\",\n          \"question\",\n          \"credits\"\n        ]\n      }\n    },\n    \"robustness_estimate\": {\n      \"type\": \"number\",\n      \"description\": \"0-100\"\n    },\n    \"sufficient\": {\n      \"type\": \"boolean\"\n    }\n  },\n  \"required\": [\n    \"round_summary\",\n    \"rulings\",\n    \"robustness_estimate\",\n    \"sufficient\"\n  ]\n}"
+      },
+      "id": "dd380d51-afa1-4d67-95d8-c21ba9b1f152",
+      "name": "Ruling Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2440,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Run Context').first().json.api_base }}/api/runs/{{ $('Run Context').first().json.run_id }}/rulings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-run-token",
+              "value": "={{ $('Run Context').first().json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.output) }}"
+      },
+      "id": "7494cb2b-5834-da81-c300-aaac0c165a57",
+      "name": "Referee: Post Rulings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c89013b5-3f14-eee5-0235-add7b5c22f0e",
+              "leftValue": "={{ $json.continue }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b071d606-5671-aba4-f290-c76a6d988166",
+      "name": "Continue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Run Context').first().json.api_base }}/api/runs/{{ $('Run Context').first().json.run_id }}/blackboard",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-run-token",
+              "value": "={{ $('Run Context').first().json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "4943bf68-fb3b-6e85-2b5d-da8793472fc1",
+      "name": "Referee: Final Blackboard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3000,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.digest }}\n\nDeliberation closed: {{ $json.stop_reason }}. Deliver the final verdict.",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are the Judge of MACRO RED TEAM delivering the final verdict on a forecast after adversarial\ninvestigation. Base everything strictly on the blackboard: surviving claims carry weight, fallen claims\ndo not, unresolved claims are uncertainty.\n\nProduce: robustness (0-100, how likely the forecast holds), your confidence in this assessment (0-100),\nvulnerability level (LOW, MEDIUM, HIGH, CRITICAL), a one-word verdict (Robust, Contested, Fragile, Broken),\nprimary and secondary vulnerability, strongest opposing and supporting evidence, the critical unknown,\nthe most dangerous concrete scenario, measurable conditions that would BREAK the forecast (and whether\nthey must occur together: AND, or any one: OR), measurable conditions that would VALIDATE it, the next\ndata to watch in priority order, and a short note on which agents contributed decisive arguments.\nThresholds must be concrete and measurable (e.g. \"Oil > $120 for 3 quarters\", \"Private capex growth < 8%\").\nAnswer through the format_final_json_response tool.",
+          "maxIterations": 4,
+          "enableStreaming": false
+        }
+      },
+      "id": "391dc1ce-066b-6b73-6d2b-1e0632973f35",
+      "name": "Judge: Verdict",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3220,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "claude-opus-5-5"
+        },
+        "options": {
+          "maxTokensToSample": 16000,
+          "thinkingMode": "adaptive",
+          "effort": "high"
+        }
+      },
+      "id": "39250d77-8ce0-16a3-0ac6-9b7591eee72b",
+      "name": "Claude: Judge (verdict)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        3180,
+        640
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "mrtAnthropicKey1",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"forecast_label\": {\n      \"type\": \"string\",\n      \"description\": \"What was forecast\"\n    },\n    \"forecast_value\": {\n      \"type\": \"string\",\n      \"description\": \"The forecast value\"\n    },\n    \"robustness\": {\n      \"type\": \"number\",\n      \"description\": \"0-100\"\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"description\": \"0-100\"\n    },\n    \"vulnerability\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"LOW\",\n        \"MEDIUM\",\n        \"HIGH\",\n        \"CRITICAL\"\n      ]\n    },\n    \"verdict\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"Robust\",\n        \"Contested\",\n        \"Fragile\",\n        \"Broken\"\n      ]\n    },\n    \"primary_vulnerability\": {\n      \"type\": \"string\",\n      \"description\": \"Primary vulnerability\"\n    },\n    \"secondary_vulnerability\": {\n      \"type\": \"string\",\n      \"description\": \"Secondary vulnerability\"\n    },\n    \"strongest_opposing_evidence\": {\n      \"type\": \"string\",\n      \"description\": \"Strongest opposing evidence\"\n    },\n    \"strongest_supporting_evidence\": {\n      \"type\": \"string\",\n      \"description\": \"Strongest supporting evidence\"\n    },\n    \"critical_unknown\": {\n      \"type\": \"string\",\n      \"description\": \"Critical unknown\"\n    },\n    \"most_dangerous_scenario\": {\n      \"type\": \"string\",\n      \"description\": \"Most dangerous scenario\"\n    },\n    \"break_conditions\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"break_logic\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"AND\",\n        \"OR\"\n      ]\n    },\n    \"validate_conditions\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"watchlist\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"indicator\": {\n            \"type\": \"string\",\n            \"description\": \"Indicator\"\n          },\n          \"why\": {\n            \"type\": \"string\",\n            \"description\": \"Why it matters\"\n          },\n          \"threshold\": {\n            \"type\": \"string\",\n            \"description\": \"Threshold to watch\"\n          }\n        },\n        \"required\": [\n          \"indicator\",\n          \"why\"\n        ]\n      }\n    },\n    \"agent_scores\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"agent\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"demand\",\n              \"supply\",\n              \"global\",\n              \"data\",\n              \"historian\",\n              \"blackswan\",\n              \"bull\"\n            ]\n          },\n          \"reason\": {\n            \"type\": \"string\",\n            \"description\": \"Decisive contribution\"\n          }\n        },\n        \"required\": [\n          \"agent\",\n          \"reason\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"robustness\",\n    \"confidence\",\n    \"vulnerability\",\n    \"verdict\",\n    \"primary_vulnerability\",\n    \"break_conditions\",\n    \"validate_conditions\",\n    \"watchlist\"\n  ]\n}"
+      },
+      "id": "58a72b90-6f08-ab32-8b68-7b725b0c55cd",
+      "name": "Verdict Schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        3340,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Run Context').first().json.api_base }}/api/runs/{{ $('Run Context').first().json.run_id }}/verdict",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-run-token",
+              "value": "={{ $('Run Context').first().json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.output) }}"
+      },
+      "id": "e2b516ee-2fce-2199-1cd7-1b09e7be1082",
+      "name": "Referee: Publish Verdict",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3460,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "width": 900,
+        "height": 300,
+        "color": 7,
+        "content": "## MACRO RED TEAM\nAn adversarial loop, not a pipeline. Top row: the orchestrator. Bottom row: the investigator, run once per task in parallel.\n\n1. The **Judge** decomposes the forecast into load-bearing assumptions and gives each of 7 adversaries an opening investigation.\n2. Each agent spends its own **investigation credits** (1 credit = 1 tool call, 10 per agent) and may request follow-ups or **delegate** to another specialist.\n3. The **Judge** cross-examines the blackboard (evidence, source independence, causal validity, contradictions) and **creates new investigations** or orders challenges.\n4. **Continue?** loops back until the judge is satisfied, budgets run out, or the round limit hits. Then the verdict.\n\nThe referee web app (app/) enforces budgets and streams everything to the war-room UI."
+      },
+      "id": "204e4376-6e66-148c-8f93-2fb123adb17b",
+      "name": "Note: How it works",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "width": 960,
+        "height": 200,
+        "color": 3,
+        "content": "### Credentials to connect\n- **Anthropic account** on the four Claude model nodes\n- **Tavily API (Bearer)**: Header Auth, name `Authorization`, value `Bearer tvly-...`\n- **FRED API key**: Query Auth, name `api_key`, value = your FRED key\n\nWorld Bank, Wikipedia and Calculator need no key. Remove a tool to skip its key."
+      },
+      "id": "0c2ee6e4-b8cd-bfe2-2df1-666f0b0d5146",
+      "name": "Note: Credentials",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        1100
+      ]
+    }
+  ],
+  "connections": {
+    "Attack Forecast": {
+      "main": [
+        [
+          {
+            "node": "Run Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Context": {
+      "main": [
+        [
+          {
+            "node": "Judge: Decompose Forecast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Judge (plan)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Judge: Decompose Forecast",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Judge: Decompose Forecast",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge: Decompose Forecast": {
+      "main": [
+        [
+          {
+            "node": "Referee: Open Round 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Referee: Open Round 1": {
+      "main": [
+        [
+          {
+            "node": "Split Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Tasks": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Investigations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Investigate Task": {
+      "main": [
+        [
+          {
+            "node": "Task Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Context": {
+      "main": [
+        [
+          {
+            "node": "Brief the Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brief the Agent": {
+      "main": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Economists": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finding Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Web Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FRED Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FRED Series": {
+      "ai_tool": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "World Bank Indicator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wikipedia": {
+      "ai_tool": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "Economist Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Economist Agent": {
+      "main": [
+        [
+          {
+            "node": "Referee: Submit Finding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Investigations": {
+      "main": [
+        [
+          {
+            "node": "Collect Round",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Round": {
+      "main": [
+        [
+          {
+            "node": "Referee: Close Round",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Referee: Close Round": {
+      "main": [
+        [
+          {
+            "node": "Judge: Cross-Examine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Judge (cross-examine)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Judge: Cross-Examine",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ruling Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Judge: Cross-Examine",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge: Cross-Examine": {
+      "main": [
+        [
+          {
+            "node": "Referee: Post Rulings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Referee: Post Rulings": {
+      "main": [
+        [
+          {
+            "node": "Continue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Continue?": {
+      "main": [
+        [
+          {
+            "node": "Split Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Referee: Final Blackboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Referee: Final Blackboard": {
+      "main": [
+        [
+          {
+            "node": "Judge: Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Judge (verdict)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Judge: Verdict",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verdict Schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Judge: Verdict",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge: Verdict": {
+      "main": [
+        [
+          {
+            "node": "Referee: Publish Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 3600
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
