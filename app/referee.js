@@ -14,6 +14,15 @@ const RULES = {
   maxFollowUpsPerFinding: 2,
 };
 
+// Scope verdicts that stop a run before any agent spends a credit. Anything
+// else, including a missing or unrecognised verdict, lets the run proceed:
+// the gate fails open so a genuine forecast is never blocked by a glitch.
+const REJECTIONS = {
+  too_vague: 'Too vague to test',
+  not_a_forecast: 'Not a forecast',
+  out_of_scope: 'Outside economics',
+};
+
 const AGENTS = [
   { id: 'demand', name: 'Demand Economist', side: 'bear', glyph: 'D',
     mission: 'Is domestic demand really strong enough?' },
@@ -89,11 +98,12 @@ function domainOf(url) {
 }
 
 class Run {
-  constructor({ forecast, maxRounds, mode }) {
+  constructor({ forecast, maxRounds, mode, force = false }) {
     this.id = crypto.randomUUID().slice(0, 8);
     this.token = crypto.randomBytes(16).toString('hex');
     this.forecast = String(forecast || '').trim();
     this.mode = mode;
+    this.force = Boolean(force);
     this.maxRounds = clampInt(maxRounds, RULES.minRounds, 8, RULES.maxRounds);
     this.createdAt = new Date().toISOString();
     this.status = 'running';
@@ -113,7 +123,7 @@ class Run {
     this.events = [];
     this.listeners = new Set();
     this.seq = { task: 0, claim: 0 };
-    this.emit('run_started', { forecast: this.forecast, max_rounds: this.maxRounds, mode });
+    this.emit('run_started', { forecast: this.forecast, max_rounds: this.maxRounds, mode, force: this.force });
   }
 
   remaining(agentId) {
@@ -240,6 +250,19 @@ class Run {
 
   applyPlan(raw) {
     const plan = parseLoose(raw);
+    const scope = typeof plan.scope === 'string' ? plan.scope.trim().toLowerCase() : 'forecast';
+    if (REJECTIONS[scope] && !this.force) {
+      this.status = 'rejected';
+      this.stopReason = REJECTIONS[scope];
+      this.emit('rejected', {
+        scope,
+        title: REJECTIONS[scope],
+        reason: plan.scope_reason || '',
+        suggested_forecast: plan.suggested_forecast || null,
+      });
+      return { continue: false, round: 0, rejected: true, tasks: [] };
+    }
+    if (REJECTIONS[scope]) this.emit('scope_overridden', { scope, reason: plan.scope_reason || '' });
     this.forecastLabel = plan.forecast_label || null;
     this.forecastValue = plan.forecast_value || null;
     this.assumptions = asArray(plan.assumptions).slice(0, 8).map((a, i) => ({
@@ -508,4 +531,4 @@ function httpError(status, message) {
   return Object.assign(new Error(message), { status });
 }
 
-module.exports = { Run, RULES, AGENTS, AGENT_IDS, normalizeAgent, parseLoose, httpError };
+module.exports = { Run, RULES, REJECTIONS, AGENTS, AGENT_IDS, normalizeAgent, parseLoose, httpError };

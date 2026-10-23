@@ -39,10 +39,11 @@ async function boot() {
     badge.classList.add('sim');
   }
   renderAgents(null);
-  $('#attack').addEventListener('click', attack);
+  $('#attack').addEventListener('click', () => attack());
 }
 
-async function attack() {
+// force=true skips the judge's scope check ("Run anyway").
+async function attack({ force = false } = {}) {
   const forecast = $('#forecast').value.trim();
   const engine = state.mode === 'n8n' ? $('#engine').value : 'simulate';
   $('#attack').disabled = true;
@@ -52,7 +53,7 @@ async function attack() {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       // ?speed=4 replays the scripted demo four times faster.
-      body: JSON.stringify({ forecast, max_rounds: Number($('#rounds').value), mode: engine, speed: Number(new URLSearchParams(location.search).get('speed')) || 1 }),
+      body: JSON.stringify({ forecast, max_rounds: Number($('#rounds').value), mode: engine, force, speed: Number(new URLSearchParams(location.search).get('speed')) || 1 }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || res.statusText);
@@ -74,7 +75,7 @@ function listen(runId) {
     const handler = HANDLERS[event.type];
     if (handler) handler(event.data, event);
     if (event.summary.round) $('#round-label').textContent = `round ${event.summary.round} of ${event.summary.max_rounds}`;
-    if (event.type === 'verdict' || event.type === 'error') {
+    if (['verdict', 'error', 'rejected'].includes(event.type)) {
       source.close();
       $('#attack').disabled = false;
     }
@@ -228,6 +229,29 @@ const HANDLERS = {
         d.contradictions.length > 0 && [el('dt', {}, 'Contradictions'),
           d.contradictions.map((c) => el('dd', {}, `${[].concat(c.between || []).join(' vs ')}: ${c.issue}${c.resolving_data ? ` → resolve with ${c.resolving_data}` : ''}`))],
         d.missing_information.length > 0 && [el('dt', {}, 'Missing information'), d.missing_information.map((m) => el('dd', {}, m))])));
+  },
+
+  rejected(d) {
+    const actions = el('div', { class: 'actions' });
+    if (d.suggested_forecast) {
+      const use = el('button', { type: 'button', class: 'btn primary' }, 'Attack the suggested forecast');
+      use.addEventListener('click', () => { $('#forecast').value = d.suggested_forecast; attack(); });
+      actions.append(use);
+    }
+    const anyway = el('button', { type: 'button', class: 'btn' }, 'Run anyway');
+    anyway.addEventListener('click', () => attack({ force: true }));
+    actions.append(anyway);
+    log(el('article', { class: 'card ruling gate' },
+      el('div', { class: 'ruling-head' }, `Judge · scope check · ${d.title}`),
+      el('p', {}, d.reason || 'The judge could not find a testable economic forecast in this text.'),
+      d.suggested_forecast && el('p', { class: 'suggestion' }, 'Did you mean: ', el('b', {}, d.suggested_forecast)),
+      el('p', { class: 'hint' }, 'No agents were dispatched and no credits were spent. Macro Red Team reviews economic, market and business forecasts.'),
+      actions));
+  },
+
+  scope_overridden(d) {
+    log(el('div', { class: 'row' }, el('span', { class: 'tag judge' }, 'override'),
+      el('span', {}, `Scope check said "${d.scope}"; running anyway as requested.`)));
   },
 
   deliberation_closed(d) {

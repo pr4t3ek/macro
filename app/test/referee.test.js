@@ -131,3 +131,38 @@ test('closing a round releases credits of investigators that never reported back
   assert.equal(run.tasks.find((t) => t.agent === 'global').status, 'lost');
   assert.match(res.digest, /CLAIMS ON THE BLACKBOARD/);
 });
+
+// --- scope gate ---------------------------------------------------------------
+
+test('scope gate fails open: genuine, missing or unrecognised verdicts all run normally', () => {
+  for (const scope of ['forecast', 'FORECAST', undefined, null, '', 'maybe', 42]) {
+    const run = newRun();
+    const res = run.applyPlan({ scope, tasks: [] });
+    assert.equal(res.continue, true, `scope ${JSON.stringify(scope)} must not block`);
+    assert.equal(res.tasks.length, AGENT_IDS.length);
+    assert.equal(run.status, 'running');
+    assert.ok(!run.events.some((e) => e.type === 'rejected'));
+  }
+});
+
+test('scope gate stops junk before any agent spends a credit', () => {
+  for (const scope of ['too_vague', 'not_a_forecast', 'out_of_scope', ' Not_A_Forecast ']) {
+    const run = newRun();
+    const res = run.applyPlan({ scope, scope_reason: 'why', suggested_forecast: scope === 'too_vague' ? 'India GDP >= 6.5% in FY27' : undefined, tasks: [{ agent: 'demand', question: 'q', credits: 2 }] });
+    assert.deepEqual([res.continue, res.rejected, res.tasks.length], [false, true, 0]);
+    assert.equal(run.status, 'rejected');
+    assert.equal(run.tasks.length + run.queue.length, 0);
+    for (const id of AGENT_IDS) assert.equal(run.remaining(id), RULES.creditsPerAgent);
+    const ev = run.events.find((e) => e.type === 'rejected');
+    assert.equal(ev.data.reason, 'why');
+    if (scope === 'too_vague') assert.equal(ev.data.suggested_forecast, 'India GDP >= 6.5% in FY27');
+  }
+});
+
+test('"Run anyway" overrides the scope gate', () => {
+  const run = new Run({ forecast: 'Argentina will win the 2030 World Cup', mode: 'test', force: true });
+  const res = run.applyPlan({ scope: 'out_of_scope', scope_reason: 'sports', assumptions: [], tasks: [] });
+  assert.equal(res.continue, true);
+  assert.equal(res.tasks.length, AGENT_IDS.length);
+  assert.ok(run.events.some((e) => e.type === 'scope_overridden'));
+});

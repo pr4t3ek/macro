@@ -188,6 +188,12 @@ select { font: 500 14px var(--sans); color: var(--text); background: var(--panel
 .sub dt { font: 700 10.5px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--judge); }
 .sub dd { margin: 0 0 4px; }
 
+.gate .suggestion { margin-top: 8px; }
+.gate .hint { margin-top: 8px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.btn { font: 600 13px var(--sans); padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
 .closed { text-align: center; font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px; }
 
 /* --- side panels ---------------------------------------------------------------- */

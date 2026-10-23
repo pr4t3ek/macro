@@ -54,6 +54,24 @@ A Flask pipeline is `Input → Agent 1 → Agent 2 → Agent 3 → Output`. Here
 | **Dynamic stopping** | The judge sets `sufficient`. The referee also stops on the round limit, exhausted budgets, or an empty queue, and forces a minimum of 2 rounds. |
 | **Rewards** | The leaderboard scores agents by which of their arguments survived cross-examination. |
 
+### Scope check: what happens with non-economic input
+
+Before any agent is dispatched, the judge classifies the submission in the same call that decomposes it, so the check adds no extra LLM call:
+
+| Judge says | Example | What happens |
+|---|---|---|
+| `forecast` | *"India GDP 7% FY28"*, *"Will the Fed cut 3 times?"*, *"Tesla hits $500"*, *"EVs reach 30% of car sales"* | Runs normally |
+| `too_vague` | *"The economy will do well"* | Stops and offers a testable rewrite with a one-click **Attack the suggested forecast** |
+| `not_a_forecast` | *"What is inflation?"*, *"hello"*, prompt-injection attempts | Stops; no agents run, no credits spent |
+| `out_of_scope` | *"Argentina will win the World Cup"* | Stops with an explanation |
+
+Genuine requests are protected in three ways:
+- The judge is told that questions, terse fragments, forecasts without a horizon, company/market/sector forecasts, other languages, and events judged by their economic effect all count as forecasts, and to choose `forecast` when in doubt.
+- The referee **fails open**: only those three explicit verdicts stop a run. A missing or garbled verdict runs normally.
+- Every stop shows a **Run anyway** button, which skips the check.
+
+`eval/scope-eval.mjs` replays 30 submissions through the exact production prompt and fails if any genuine forecast is rejected (see Development).
+
 ### The cast
 
 | Agent | Mission | Rewarded for |
@@ -178,8 +196,18 @@ Every event the UI renders is listed in `HANDLERS` in `app/public/app.js`. All a
 ## Development
 
 ```bash
-cd app && npm test     # referee rules, budgets, delegation, stopping, simulator
+cd app && npm test     # referee rules, budgets, delegation, stopping, scope gate, simulator
 ```
+
+Check the scope gate against real Claude whenever you change the judge prompt:
+
+```bash
+cd eval && npm install
+ANTHROPIC_API_KEY=sk-ant-... npm run scope                  # 30 cases, about 30 judge calls
+npm run scope -- --model claude-sonnet-5-5 --only genuine   # cheaper, genuine forecasts only
+```
+
+The script exits non-zero if any genuine forecast is rejected. Add your own real-world phrasings to `CASES` in the script. The eval enables server-side refusal fallbacks (`fallbacks: "default"`), so a safety decline is retried on another model rather than counted as a rejection.
 
 The workflow was verified end-to-end on n8n 2.44.6 with a mocked Anthropic API (via the credential's base URL) and mocked data APIs. The test covered a full run: decomposition, 7 parallel investigators calling tools, per-call billing, a delegated follow-up, a judge-ordered challenge, the stopping decision and the verdict.
 

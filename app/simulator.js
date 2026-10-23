@@ -202,6 +202,8 @@ const FINDINGS = {
 };
 
 const PLAN = {
+  scope: 'forecast',
+  scope_reason: 'A dated, quantified GDP growth forecast.',
   forecast_label: 'India real GDP growth, FY28',
   forecast_value: '7.0%',
   horizon: 'FY2027-28',

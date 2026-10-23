@@ -93,7 +93,7 @@ const routes = [
     const body = await readJson(req);
     if (!body.forecast || String(body.forecast).trim().length < 8) throw httpError(400, 'give me a forecast to attack');
     const mode = body.mode === 'simulate' || !N8N_WEBHOOK_URL ? 'simulate' : 'n8n';
-    const run = new Run({ forecast: body.forecast, maxRounds: body.max_rounds, mode });
+    const run = new Run({ forecast: body.forecast, maxRounds: body.max_rounds, mode, force: body.force === true });
     runs.set(run.id, run);
     if (mode === 'n8n') startN8n(run);
     else simulate(run, { speed: Number(body.speed) || 1 });
