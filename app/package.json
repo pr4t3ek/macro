@@ -1,0 +1,13 @@
+{
+  "name": "macro-red-team",
+  "version": "1.0.0",
+  "private": true,
+  "description": "War-room UI and referee/blackboard for the Macro Red Team n8n agents",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "demo": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=20" }
+}

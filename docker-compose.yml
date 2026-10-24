@@ -1,0 +1,30 @@
+# One command brings up n8n (the agents) and the war room (UI + referee).
+#   docker compose up -d
+# Then import n8n/macro-red-team.workflow.json into n8n, connect credentials,
+# publish the workflow, and open http://localhost:3000.
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.44.6
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=UTC
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/workflows:ro
+
+  app:
+    build: ./app
+    ports:
+      - "3000:3000"
+    environment:
+      # How the war room reaches n8n, and how n8n reaches the war room, inside the compose network.
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/macro-red-team
+      - PUBLIC_API_BASE=http://app:3000
+    depends_on:
+      - n8n
+
+volumes:
+  n8n_data:
