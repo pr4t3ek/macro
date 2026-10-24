@@ -26,16 +26,10 @@ const REJECTIONS = {
 const AGENTS = [
   { id: 'demand', name: 'Demand Economist', side: 'bear', glyph: 'D',
     mission: 'Is domestic demand really strong enough?' },
-  { id: 'supply', name: 'Supply Economist', side: 'bear', glyph: 'S',
-    mission: 'Break the forecast from the supply side.' },
   { id: 'global', name: 'Global Shock Agent', side: 'bear', glyph: 'G',
     mission: 'Find the external event that invalidates it.' },
   { id: 'data', name: 'Data Detective', side: 'bear', glyph: '?',
     mission: 'Attack the data, not the economics.' },
-  { id: 'historian', name: 'Historical Analog Agent', side: 'bear', glyph: 'H',
-    mission: 'When have we seen this configuration before?' },
-  { id: 'blackswan', name: 'Black Swan Agent', side: 'bear', glyph: 'B',
-    mission: 'The plausible event nobody else considered.' },
   { id: 'bull', name: 'Bull Defender', side: 'bull', glyph: '+',
     mission: 'Prove the forecast is robust. Rebut every attack.' },
 ];
@@ -43,11 +37,8 @@ const AGENT_IDS = AGENTS.map((a) => a.id);
 
 const ALIASES = {
   demand: 'demand', 'demand economist': 'demand', 'demand agent': 'demand',
-  supply: 'supply', 'supply economist': 'supply', 'supply agent': 'supply',
   global: 'global', 'global shock': 'global', 'global shock agent': 'global', globalshock: 'global',
   data: 'data', 'data detective': 'data', datadetective: 'data',
-  historian: 'historian', 'historical analog': 'historian', 'historical analog agent': 'historian', history: 'historian',
-  blackswan: 'blackswan', 'black swan': 'blackswan', 'black swan agent': 'blackswan', black_swan: 'blackswan',
   bull: 'bull', 'bull defender': 'bull', 'bull agent': 'bull', defender: 'bull',
 };
 

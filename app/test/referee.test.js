@@ -34,10 +34,10 @@ test('agents pay for actual tool calls, including overspend, but never below zer
 
 test('reasoning-only answers cost one credit; failed runs forfeit the allocation', () => {
   const run = newRun();
-  const { tasks } = run.applyPlan({ tasks: [{ agent: 'supply', question: 'q', credits: 3 }, { agent: 'global', question: 'q', credits: 3 }] });
-  const supply = tasks.find((t) => t.agent === 'supply');
+  const { tasks } = run.applyPlan({ tasks: [{ agent: 'bull', question: 'q', credits: 3 }, { agent: 'global', question: 'q', credits: 3 }] });
+  const bull = tasks.find((t) => t.agent === 'bull');
   const global = tasks.find((t) => t.agent === 'global');
-  assert.equal(run.recordFinding({ task_id: supply.task_id, output: { headline: 'h', done: true }, steps: [] }).charged, 1);
+  assert.equal(run.recordFinding({ task_id: bull.task_id, output: { headline: 'h', done: true }, steps: [] }).charged, 1);
   assert.equal(run.recordFinding({ task_id: global.task_id, output: { error: 'Max iterations (5) reached' }, steps: [] }).charged, 3);
   assert.equal(run.claims.at(-1).headline, 'Investigation failed');
 });
@@ -52,14 +52,14 @@ test('follow-ups become self-directed or delegated tasks for the next round', ()
       headline: 'h', done: false,
       follow_ups: [
         { agent: 'data', question: 'Who forecasts capex?', credits: 2 },
-        { agent: 'Historical Analog Agent', question: 'Find analogs', credits: 2 },
+        { agent: 'Global Shock Agent', question: 'Check the oil channel', credits: 2 },
         { agent: 'bull', question: 'third one is dropped', credits: 1 },
       ],
     },
     steps: toolSteps(1),
   });
   const origins = run.queue.map((t) => [t.agent, t.origin, t.requested_by, t.parent]);
-  assert.deepEqual(origins, [['data', 'agent', 'data', data.task_id], ['historian', 'delegation', 'data', data.task_id]]);
+  assert.deepEqual(origins, [['data', 'agent', 'data', data.task_id], ['global', 'delegation', 'data', data.task_id]]);
 });
 
 test('task with no credits left is rejected when the round opens', () => {
@@ -103,7 +103,8 @@ test('rulings update claim status and drive the leaderboard', () => {
 });
 
 test('helpers tolerate messy LLM output', () => {
-  assert.equal(normalizeAgent('Black Swan'), 'blackswan');
+  assert.equal(normalizeAgent('Bull Defender'), 'bull');
+  assert.equal(normalizeAgent('Black Swan'), null, 'removed agents are rejected, not silently remapped');
   assert.equal(normalizeAgent('global-shock'), 'global');
   assert.equal(normalizeAgent('nobody'), null);
   assert.deepEqual(parseLoose('```json\n{"a":1}\n```'), { a: 1 });
@@ -165,4 +166,12 @@ test('"Run anyway" overrides the scope gate', () => {
   assert.equal(res.continue, true);
   assert.equal(res.tasks.length, AGENT_IDS.length);
   assert.ok(run.events.some((e) => e.type === 'scope_overridden'));
+});
+
+test('roster is the four kept agents; tasks for removed agents are rejected', () => {
+  assert.deepEqual(AGENT_IDS, ['demand', 'global', 'data', 'bull']);
+  const run = newRun();
+  const res = run.applyPlan({ tasks: [{ agent: 'historian', question: 'Find analogs', credits: 2 }] });
+  assert.equal(res.tasks.length, 4);
+  assert.ok(run.events.some((e) => e.type === 'task_rejected' && /unknown agent/.test(e.data.reason)));
 });

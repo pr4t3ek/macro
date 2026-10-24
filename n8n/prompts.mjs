@@ -1,8 +1,8 @@
 // Personas, judge prompts and output schemas for the Macro Red Team n8n
 // workflow. build-workflow.mjs embeds these into the workflow JSON.
 
-const AGENT_ROSTER = `demand (Demand Economist), supply (Supply Economist), global (Global Shock Agent),
-data (Data Detective), historian (Historical Analog Agent), blackswan (Black Swan Agent), bull (Bull Defender)`;
+const AGENT_ROSTER = `demand (Demand Economist), global (Global Shock Agent), data (Data Detective),
+bull (Bull Defender)`;
 
 const SHARED_RULES = `
 RULES OF THE GAME
@@ -26,16 +26,9 @@ export const PERSONAS = {
     reward: 'You are rewarded when your demand-side arguments survive the judge\'s cross-examination.',
     brief: `You test whether domestic demand is strong enough to deliver the forecast.
 Investigate: private consumption, household and bank credit (secured vs unsecured), wages and real incomes,
-employment, rural vs urban demand, housing, private investment demand, household savings.
+employment, rural vs urban demand, housing, household savings, and private investment demand
+(corporate capex intentions, new project announcements).
 Ask: is demand income-funded or debt-funded? Is it broad-based or concentrated? Is it pulled forward?`,
-  },
-  supply: {
-    name: 'Supply Economist',
-    reward: 'You are rewarded for breaking the forecast from the supply side.',
-    brief: `You try to destroy the forecast from the supply side.
-Investigate: commodities, energy availability and prices, capacity utilisation, productivity,
-supply chains and logistics, agriculture and monsoon, power, labour supply, corporate capex intentions.
-Ask: what binding constraint caps growth or forces inflation and tighter policy?`,
   },
   global: {
     name: 'Global Shock Agent',
@@ -52,21 +45,6 @@ Ask: are these indicators measuring what we think they measure? Look for base ef
 accumulation, statistical discrepancies, government-spending-driven prints, deflator problems,
 revisions, survey bias, and forecasts that all trace back to one source. Identify which single input
 the forecast leans on most heavily (back-solve the arithmetic) and who else forecasts that input.`,
-  },
-  historian: {
-    name: 'Historical Analog Agent',
-    reward: 'You are rewarded for finding comparable historical episodes that change the debate.',
-    brief: `You search economic history: "When have we seen this combination of conditions before?"
-Find concrete episodes (country, years) with a similar configuration and report what happened next,
-and where the analogy breaks down. Use Wikipedia and World Bank series to anchor dates and numbers.`,
-  },
-  blackswan: {
-    name: 'Black Swan Agent',
-    reward: 'You are rewarded for a plausible scenario nobody else considered — not science fiction.',
-    brief: `Find a plausible event that nobody else on the blackboard has considered.
-It must be grounded: you must fill the "scenario" object with
-event -> transmission mechanism -> measurable indicators -> economic impact (with a rough magnitude)
-and an honest probability. Avoid risks other agents already raised.`,
   },
   bull: {
     name: 'Bull Defender',
@@ -116,7 +94,7 @@ economic forecast. Your first job is to check the submission is in scope, then d
 2. List 3-6 load-bearing assumptions the forecast silently depends on (consumption, investment,
    external environment, supply, policy, data quality...). Give each a load_bearing weight 0-1:
    how much of the forecast collapses if it is wrong.
-3. Give each of the 7 agents one sharp opening investigation aimed at the assumption most relevant to
+3. Give each of the 4 agents one sharp opening investigation aimed at the assumption most relevant to
    their speciality: ${AGENT_ROSTER.replace(/\n/g, ' ')}.
    Each agent only has 10 credits (1 credit = 1 tool call) for the whole exercise, so opening moves
    should cost 1-3 credits.
@@ -163,7 +141,7 @@ Answer through the format_final_json_response tool.`;
 
 const str = (description) => ({ type: 'string', description });
 const num = (description) => ({ type: 'number', description });
-const AGENT_ENUM = ['demand', 'supply', 'global', 'data', 'historian', 'blackswan', 'bull'];
+const AGENT_ENUM = ['demand', 'global', 'data', 'bull'];
 
 const investigation = {
   type: 'object',
@@ -221,17 +199,6 @@ export const FINDING_SCHEMA = {
           date: str('Date or period of the data'),
         },
         required: ['fact', 'source'],
-      },
-    },
-    scenario: {
-      type: 'object',
-      description: 'Black Swan Agent only',
-      properties: {
-        event: str('The event'),
-        transmission: str('Transmission mechanism'),
-        indicators: { type: 'array', items: { type: 'string' } },
-        impact: str('Economic impact with rough magnitude'),
-        probability: str('Honest probability'),
       },
     },
     indicators_to_watch: {

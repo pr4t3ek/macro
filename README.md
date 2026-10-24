@@ -2,7 +2,7 @@
 
 **An autonomous multi-agent system that tries to break economic forecasts before decision-makers trust them.**
 
-Give it a forecast, such as *"India's GDP will grow 7% in FY28"*, and press **Attack forecast**. Seven adversarial agents investigate it. Each has its own budget and tools. They delegate to each other and challenge each other's claims. A judge cross-examines every round, decides what to investigate next, and finally delivers a verdict: robustness, primary vulnerability, what would break the forecast, and what data to watch.
+Give it a forecast, such as *"India's GDP will grow 7% in FY28"*, and press **Attack forecast**. Four adversarial agents investigate it. Each has its own budget and tools. They delegate to each other and challenge each other's claims. A judge cross-examines every round, decides what to investigate next, and finally delivers a verdict: robustness, primary vulnerability, what would break the forecast, and what data to watch.
 
 The innovation isn't prediction. It's **adversarial economic reasoning**.
 
@@ -76,12 +76,9 @@ Genuine requests are protected in three ways:
 
 | Agent | Mission | Rewarded for |
 |---|---|---|
-| Demand Economist | Is domestic demand strong enough? (consumption, credit, wages, jobs, housing) | Demand arguments that survive |
-| Supply Economist | Break it from the supply side (energy, capacity, productivity, agriculture) | Supply-side breaks |
+| Demand Economist | Is domestic demand strong enough? (consumption, credit, wages, jobs, housing, corporate capex intentions) | Demand arguments that survive |
 | Global Shock Agent | Find the external event that invalidates it (Fed, China, crude, flows, FX) | External invalidators |
 | Data Detective | Attack the data: base effects, inventories, government spending, revisions | Unreliable evidence |
-| Historical Analog Agent | When have we seen this configuration before? | Decisive analogs |
-| Black Swan Agent | Event → transmission → indicators → impact, nobody else considered | Plausible novel scenarios |
 | Bull Defender | Prove the forecast is robust, rebut attacks by claim id | Forecast surviving |
 | **Judge** | Decompose, cross-examine, order investigations, decide when to stop, deliver the verdict | Correctly identifying which arguments survive |
 
@@ -223,7 +220,7 @@ npm run scope -- --model claude-sonnet-5-5 --only genuine   # cheaper, genuine f
 
 The script exits non-zero if any genuine forecast is rejected. Add your own real-world phrasings to `CASES` in the script. The eval enables server-side refusal fallbacks (`fallbacks: "default"`), so a safety decline is retried on another model rather than counted as a rejection.
 
-The Claude and Gemini workflows were verified end-to-end on n8n 2.44.6 against mocked model APIs (via the credential's base URL) and mocked data APIs. The OpenAI and OpenRouter files are built from the same template but haven't been run. The test covered a full run: decomposition, 7 parallel investigators calling tools, per-call billing, a delegated follow-up, a judge-ordered challenge, the stopping decision and the verdict.
+The Claude and Gemini workflows were verified end-to-end on n8n 2.44.6 against mocked model APIs (via the credential's base URL) and mocked data APIs. The OpenAI and OpenRouter files are built from the same template but haven't been run. The test covered a full run: decomposition, parallel investigators calling tools, per-call billing, a delegated follow-up, a judge-ordered challenge, the stopping decision and the verdict.
 
 **Limitations:**
 - Runs live in memory, so restarting the server forgets them.
