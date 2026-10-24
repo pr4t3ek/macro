@@ -1,6 +1,9 @@
-// Generates macro-red-team.workflow.json — an n8n workflow you can import
+// Generates the Macro Red Team n8n workflow you import into n8n
 // (Workflows -> Import from File, or `n8n import:workflow --input=...`).
-//   node n8n/build-workflow.mjs [--model claude-opus-5-5]
+//   node n8n/build-workflow.mjs                         # Claude  -> macro-red-team.workflow.json
+//   node n8n/build-workflow.mjs --provider gemini       # Gemini  -> macro-red-team.gemini.workflow.json
+//   node n8n/build-workflow.mjs --provider openai --model gpt-5-mini
+//   node n8n/build-workflow.mjs --all                   # every provider with its default model
 //
 // Topology (the loop is what makes it agentic):
 //
@@ -32,11 +35,71 @@ const flag = (name, fallback) => {
   const i = args.indexOf(name);
   return i === -1 ? fallback : args[i + 1];
 };
-const MODEL = flag('--model', 'claude-opus-5-5');
-const OUT = flag('--out', path.join(path.dirname(fileURLToPath(import.meta.url)), 'macro-red-team.workflow.json'));
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+// Every agent's LLM comes from one provider. Each entry maps to a native n8n
+// chat-model node; `effort` is 'medium' for investigators, 'high' for the judge.
+const PROVIDERS = {
+  anthropic: {
+    label: 'Claude',
+    model: 'claude-opus-5-5',
+    credentials: { anthropicApi: { id: 'mrtAnthropicKey1', name: 'Anthropic account' } },
+    setup: '**Anthropic account**: API key from platform.claude.com',
+    // Adaptive thinking, no sampling params: current Claude models reject temperature and disabled thinking.
+    node: (model, effort) => ['@n8n/n8n-nodes-langchain.lmChatAnthropic', 1.6, {
+      model: { __rl: true, mode: 'id', value: model },
+      options: { maxTokensToSample: 16000, thinkingMode: 'adaptive', effort },
+    }],
+  },
+  gemini: {
+    label: 'Gemini',
+    model: 'models/gemini-3-flash-preview',
+    credentials: { googlePalmApi: { id: 'mrtGeminiApiKey1', name: 'Google Gemini(PaLM) Api account' } },
+    setup: '**Google Gemini(PaLM) Api account**: API key from aistudio.google.com',
+    node: (model) => ['@n8n/n8n-nodes-langchain.lmChatGoogleGemini', 1.2, {
+      modelName: model,
+      options: { maxOutputTokens: 16000 },
+    }],
+  },
+  openai: {
+    label: 'OpenAI',
+    model: 'gpt-5-mini',
+    credentials: { openAiApi: { id: 'mrtOpenAiApiKey1', name: 'OpenAi account' } },
+    setup: '**OpenAi account**: API key from platform.openai.com',
+    node: (model, effort) => ['@n8n/n8n-nodes-langchain.lmChatOpenAi', 1.3, {
+      model: { __rl: true, mode: 'id', value: model },
+      options: { reasoningEffort: effort },
+    }],
+  },
+  openrouter: {
+    label: 'OpenRouter',
+    model: 'openai/gpt-4.1-mini',
+    credentials: { openRouterApi: { id: 'mrtOpenRouterKey1', name: 'OpenRouter account' } },
+    setup: '**OpenRouter account**: one key from openrouter.ai for Claude, Gemini, GPT and more; pick the model in each model node',
+    node: (model) => ['@n8n/n8n-nodes-langchain.lmChatOpenRouter', 1, { model, options: {} }],
+  },
+};
+
+if (args.includes('--all')) {
+  const { execFileSync } = await import('node:child_process');
+  for (const name of Object.keys(PROVIDERS)) {
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--provider', name], { stdio: 'inherit' });
+  }
+  process.exit(0);
+}
+
+const PROVIDER_NAME = flag('--provider', 'anthropic');
+const PROVIDER = PROVIDERS[PROVIDER_NAME];
+if (!PROVIDER) {
+  console.error(`unknown --provider "${PROVIDER_NAME}"; choose one of: ${Object.keys(PROVIDERS).join(', ')}`);
+  process.exit(1);
+}
+const MODEL = flag('--model', PROVIDER.model);
+const OUT = flag('--out', path.join(HERE, PROVIDER_NAME === 'anthropic'
+  ? 'macro-red-team.workflow.json'
+  : `macro-red-team.${PROVIDER_NAME}.workflow.json`));
 
 const CREDENTIALS = {
-  anthropic: { anthropicApi: { id: 'mrtAnthropicKey1', name: 'Anthropic account' } },
   tavily: { httpHeaderAuth: { id: 'mrtTavilyApiKey1', name: 'Tavily API (Bearer)' } },
   fred: { httpQueryAuth: { id: 'mrtFredApiKey001', name: 'FRED API key' } },
 };
@@ -76,11 +139,9 @@ function referee(name, position, method, suffix, body, from = 'Run Context') {
   return node(name, 'n8n-nodes-base.httpRequest', 4.2, position, params);
 }
 
-function claude(name, position, effort) {
-  return node(name, '@n8n/n8n-nodes-langchain.lmChatAnthropic', 1.6, position, {
-    model: { __rl: true, mode: 'id', value: MODEL },
-    options: { maxTokensToSample: 16000, thinkingMode: 'adaptive', effort },
-  }, { credentials: CREDENTIALS.anthropic });
+function llm(role, position, effort) {
+  const [type, version, parameters] = PROVIDER.node(MODEL, effort);
+  return node(`${PROVIDER.label}: ${role}`, type, version, position, parameters, { credentials: PROVIDER.credentials });
 }
 
 function schema(name, position, jsonSchema) {
@@ -133,10 +194,10 @@ agent('Judge: Decompose Forecast', [440, 300], {
   systemMessage: JUDGE_DECOMPOSE_SYSTEM,
   maxIterations: 4,
 });
-claude('Claude: Judge (plan)', [400, 520], 'high');
+const judgePlanModel = llm('Judge (plan)', [400, 520], 'high');
 schema('Plan Schema', [560, 520], PLAN_SCHEMA);
 connect('Run Context', 'Judge: Decompose Forecast');
-connect('Claude: Judge (plan)', 'Judge: Decompose Forecast', 'ai_languageModel');
+connect(judgePlanModel, 'Judge: Decompose Forecast', 'ai_languageModel');
 connect('Plan Schema', 'Judge: Decompose Forecast', 'ai_outputParser');
 
 referee('Referee: Open Round 1', [700, 300], 'POST', '/plan', '$json.output');
@@ -214,10 +275,10 @@ agent('Economist Agent', [680, Y], {
   maxIterations: '={{ $json.max_iterations }}',
   extraOptions: { returnIntermediateSteps: true },
 }, { onError: 'continueRegularOutput' });
-claude('Claude: Economists', [460, Y + 260], 'medium');
+const economistModel = llm('Economists', [460, Y + 260], 'medium');
 schema('Finding Schema', [600, Y + 260], FINDING_SCHEMA);
 connect('Brief the Agent', 'Economist Agent');
-connect('Claude: Economists', 'Economist Agent', 'ai_languageModel');
+connect(economistModel, 'Economist Agent', 'ai_languageModel');
 connect('Finding Schema', 'Economist Agent', 'ai_outputParser');
 
 // Tools. Each call costs the calling agent one investigation credit.
@@ -292,10 +353,10 @@ agent('Judge: Cross-Examine', [2320, 300], {
   systemMessage: JUDGE_CROSS_EXAMINE_SYSTEM,
   maxIterations: 4,
 });
-claude('Claude: Judge (cross-examine)', [2280, 520], 'high');
+const judgeCrossModel = llm('Judge (cross-examine)', [2280, 520], 'high');
 schema('Ruling Schema', [2440, 520], RULING_SCHEMA);
 connect('Referee: Close Round', 'Judge: Cross-Examine');
-connect('Claude: Judge (cross-examine)', 'Judge: Cross-Examine', 'ai_languageModel');
+connect(judgeCrossModel, 'Judge: Cross-Examine', 'ai_languageModel');
 connect('Ruling Schema', 'Judge: Cross-Examine', 'ai_outputParser');
 
 referee('Referee: Post Rulings', [2560, 300], 'POST', '/rulings', '$json.output');
@@ -326,10 +387,10 @@ agent('Judge: Verdict', [3220, 420], {
   systemMessage: JUDGE_VERDICT_SYSTEM,
   maxIterations: 4,
 });
-claude('Claude: Judge (verdict)', [3180, 640], 'high');
+const judgeVerdictModel = llm('Judge (verdict)', [3180, 640], 'high');
 schema('Verdict Schema', [3340, 640], VERDICT_SCHEMA);
 connect('Referee: Final Blackboard', 'Judge: Verdict');
-connect('Claude: Judge (verdict)', 'Judge: Verdict', 'ai_languageModel');
+connect(judgeVerdictModel, 'Judge: Verdict', 'ai_languageModel');
 connect('Verdict Schema', 'Judge: Verdict', 'ai_outputParser');
 
 referee('Referee: Publish Verdict', [3460, 420], 'POST', '/verdict', '$json.output');
@@ -342,11 +403,11 @@ node('Note: How it works', 'n8n-nodes-base.stickyNote', 1, [-40, -60], {
 });
 node('Note: Credentials', 'n8n-nodes-base.stickyNote', 1, [1500, Y + 200], {
   width: 960, height: 200, color: 3,
-  content: `### Credentials to connect\n- **Anthropic account** on the four Claude model nodes\n- **Tavily API (Bearer)**: Header Auth, name \`Authorization\`, value \`Bearer tvly-...\`\n- **FRED API key**: Query Auth, name \`api_key\`, value = your FRED key\n\nWorld Bank, Wikipedia and Calculator need no key. Remove a tool to skip its key.`,
+  content: `### Credentials to connect\n- ${PROVIDER.setup}, on the four ${PROVIDER.label} model nodes\n- **Tavily API (Bearer)**: Header Auth, name \`Authorization\`, value \`Bearer tvly-...\`\n- **FRED API key**: Query Auth, name \`api_key\`, value = your FRED key\n\nWorld Bank, Wikipedia and Calculator need no key. Remove a tool to skip its key.`,
 });
 
 const workflow = {
-  name: 'Macro Red Team',
+  name: PROVIDER_NAME === 'anthropic' ? 'Macro Red Team' : `Macro Red Team (${PROVIDER.label})`,
   nodes,
   connections,
   pinData: {},
@@ -357,4 +418,4 @@ const workflow = {
 };
 
 writeFileSync(OUT, `${JSON.stringify(workflow, null, 2)}\n`);
-console.log(`wrote ${OUT} (${nodes.length} nodes, model ${MODEL})`);
+console.log(`wrote ${path.relative(process.cwd(), OUT)} (${nodes.length} nodes, ${PROVIDER.label} ${MODEL})`);

@@ -100,16 +100,25 @@ Without `N8N_WEBHOOK_URL` the server replays a scripted India-FY28 debate throug
 
 ### 2. Live agents with n8n
 
-You need an [Anthropic API key](https://console.anthropic.com/), plus optionally a [Tavily](https://tavily.com/) key (web search) and a [FRED](https://fred.stlouisfed.org/docs/api/api_key.html) key. World Bank, Wikipedia and the calculator need no key.
+You need one LLM API key from any provider below, plus optionally a [Tavily](https://tavily.com/) key (web search) and a [FRED](https://fred.stlouisfed.org/docs/api/api_key.html) key. World Bank, Wikipedia and the calculator need no key.
+
+| Provider | Workflow file to import | Get a key | Default model |
+|---|---|---|---|
+| Anthropic Claude (recommended) | `n8n/macro-red-team.workflow.json` | [platform.claude.com](https://platform.claude.com) → Settings → API Keys | `claude-opus-5-5` |
+| Google Gemini | `n8n/macro-red-team.gemini.workflow.json` | [aistudio.google.com](https://aistudio.google.com) → Get API key | `models/gemini-3-flash-preview` |
+| OpenAI | `n8n/macro-red-team.openai.workflow.json` | [platform.openai.com](https://platform.openai.com) → API keys | `gpt-5-mini` |
+| OpenRouter (one key, many models) | `n8n/macro-red-team.openrouter.workflow.json` | [openrouter.ai](https://openrouter.ai) → Keys | `openai/gpt-4.1-mini` |
+
+The prompts, tools, loop and scope check are identical in all four files; only the four model nodes differ. To use a different model, pick one from the model dropdown in each model node, which lists what your key can access, or regenerate the file (see below). Rate limits matter: up to 8 agents call the model at once, so a low-tier or free key may return "429 Too Many Requests". If it does, lower `maxTasksPerRound` in `app/referee.js` or upgrade the tier.
 
 ```bash
 docker compose up -d     # n8n on :5678, war room on :3000
 ```
 
 1. Open n8n at http://localhost:5678 and create the owner account.
-2. **Workflows → Import from File** → `n8n/macro-red-team.workflow.json`.
+2. **Workflows → Import from File** → the workflow file for your provider (table above).
 3. Connect credentials. The sticky note on the canvas lists them:
-   - **Anthropic account** on the four `Claude:` model nodes
+   - Your LLM key on the four model nodes (`Claude:`, `Gemini:`, `OpenAI:` or `OpenRouter:`); create it once and reuse it on the other three
    - **Tavily API (Bearer)**: Header Auth, name `Authorization`, value `Bearer tvly-…`
    - **FRED API key**: Query Auth, name `api_key`, value = your key
 
@@ -151,17 +160,22 @@ npm start
 The workflow JSON is generated, so edit the sources rather than the JSON:
 
 ```bash
-node n8n/build-workflow.mjs                            # default model: claude-opus-5-5
-node n8n/build-workflow.mjs --model claude-sonnet-5-5  # cheaper runs
+node n8n/build-workflow.mjs                                  # Claude, claude-opus-5-5
+node n8n/build-workflow.mjs --model claude-sonnet-5-5        # Claude, cheaper runs
+node n8n/build-workflow.mjs --provider gemini --model models/gemini-3-pro-preview
+node n8n/build-workflow.mjs --provider openai --model gpt-5
+node n8n/build-workflow.mjs --all                            # regenerate all four files
 ```
+
+Model IDs for other providers are passed through as-is, so use the exact ID the provider lists.
 
 - Personas, judge prompts and output schemas: `n8n/prompts.mjs`
 - Nodes, tools and wiring: `n8n/build-workflow.mjs`
 - Game rules (credits, rounds, tasks per round): `RULES` in `app/referee.js`
 
-The model nodes use adaptive thinking (effort `medium` for investigators, `high` for the judge) and send no sampling parameters. Current Claude models reject `temperature` and disabled thinking, so don't add them back in the node options.
+The Claude nodes use adaptive thinking (effort `medium` for investigators, `high` for the judge) and send no sampling parameters. Current Claude models reject `temperature` and disabled thinking, so don't add them back in the node options. The OpenAI nodes map the same split onto `reasoningEffort`.
 
-**Cost.** A 4-round run is roughly 15–25 investigator runs plus 5–6 judge calls. Try a few runs with `--model claude-sonnet-5-5` before a live demo.
+**Cost.** A 4-round run is roughly 15–25 investigator runs plus 5–6 judge calls, whichever provider you use. Try a few runs with a cheaper model before a live demo.
 
 ### Referee API (what n8n calls)
 
@@ -209,7 +223,7 @@ npm run scope -- --model claude-sonnet-5-5 --only genuine   # cheaper, genuine f
 
 The script exits non-zero if any genuine forecast is rejected. Add your own real-world phrasings to `CASES` in the script. The eval enables server-side refusal fallbacks (`fallbacks: "default"`), so a safety decline is retried on another model rather than counted as a rejection.
 
-The workflow was verified end-to-end on n8n 2.44.6 with a mocked Anthropic API (via the credential's base URL) and mocked data APIs. The test covered a full run: decomposition, 7 parallel investigators calling tools, per-call billing, a delegated follow-up, a judge-ordered challenge, the stopping decision and the verdict.
+The Claude and Gemini workflows were verified end-to-end on n8n 2.44.6 against mocked model APIs (via the credential's base URL) and mocked data APIs. The OpenAI and OpenRouter files are built from the same template but haven't been run. The test covered a full run: decomposition, 7 parallel investigators calling tools, per-call billing, a delegated follow-up, a judge-ordered challenge, the stopping decision and the verdict.
 
 **Limitations:**
 - Runs live in memory, so restarting the server forgets them.

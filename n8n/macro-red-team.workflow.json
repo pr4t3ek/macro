@@ -837,7 +837,7 @@
         "width": 960,
         "height": 200,
         "color": 3,
-        "content": "### Credentials to connect\n- **Anthropic account** on the four Claude model nodes\n- **Tavily API (Bearer)**: Header Auth, name `Authorization`, value `Bearer tvly-...`\n- **FRED API key**: Query Auth, name `api_key`, value = your FRED key\n\nWorld Bank, Wikipedia and Calculator need no key. Remove a tool to skip its key."
+        "content": "### Credentials to connect\n- **Anthropic account**: API key from platform.claude.com, on the four Claude model nodes\n- **Tavily API (Bearer)**: Header Auth, name `Authorization`, value `Bearer tvly-...`\n- **FRED API key**: Query Auth, name `api_key`, value = your FRED key\n\nWorld Bank, Wikipedia and Calculator need no key. Remove a tool to skip its key."
       },
       "id": "0c2ee6e4-b8cd-bfe2-2df1-666f0b0d5146",
       "name": "Note: Credentials",
